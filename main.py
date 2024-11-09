@@ -1,6 +1,8 @@
 import sys
 from threading import Timer
+from random import sample
 
+import psycopg2
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow
 
@@ -12,16 +14,63 @@ class Notification(QWidget):
 
 
 class TestScreen(QWidget):
-    def __init__(self):
+    def __init__(self, test):
         super().__init__()
-        uic.loadUi("templates/test_screen.ui", self)
+        uic.loadUi("templates/TrueFalseTestScreen.ui", self)
+        self.test = test
+        self.cur_index = 0
+        self.data = test.data
+        self.db_word = self.data[self.cur_index][0]
+        self.is_rigth = self.data[self.cur_index][1]
+        self.true_btn.clicked.connect(self.handleAnswer)
+        self.false_btn.clicked.connect(self.handleAnswer)
+        self.word.setText(self.db_word)
+        self.clicked = False
+
+    def handleAnswer(self):
+        sender = self.sender().text()
+        # if not self.clicked:
+        if sender == "Верно" and self.is_rigth:
+            self.word.setStyleSheet("* {color: green }")
+            self.true_btn.setStyleSheet("* {color: green }")
+        elif sender == "Неверно" and (not self.is_rigth):
+            self.word.setStyleSheet("* {color: green }")
+            self.false_btn.setStyleSheet("* {color: green }")
+        else:
+            self.word.setStyleSheet("* {color: red }")
+            if sender == "Верно":
+                self.true_btn.setStyleSheet("* {color: red }")
+            else:
+                self.false_btn.setStyleSheet("* {color: red }")
+
+        self.true_btn.setEnabled(False)
+        self.false_btn.setEnabled(False)
+        # self.clicked = True
+
+    def nextBtn(self):
+        self.cur_index += 1
+        self.db_word = self.data[self.cur_index][0]
+        self.is_rigth = self.data[self.cur_index][1]
+        self.word.setText(self.db_word)
 
 
 class Test:
-    def __init__(self, questions_quantity, time):
+    def __init__(self, questions_quantity, time, topic):
         self.qq = questions_quantity
         self.answers = dict()
         self.time = int(time.split(':')[0]) * 60 + int(time.split(':')[1])
+        if topic == 'stress':
+            self.stress()
+
+    def stress(self):
+        conn = psycopg2.connect(dbname='words', user='postgres', password='Uhbirf55', host='localhost')
+        cursor = conn.cursor()
+
+        nums = sample(range(1, 249), 10)
+        cursor.execute(f"SELECT word, is_rigth FROM stress WHERE word_id IN {tuple(nums)}")
+        data = cursor.fetchall()
+        conn.commit()
+        self.data = data
 
     def start(self):
         timer = Timer(self.time, self.finish)
@@ -51,11 +100,7 @@ class StartTestBase(QWidget):
         self.topicLabel.setText(self.topic)
         self.startButton.clicked.connect(self.handleTestStart)
         self.tasksInitUI()
-        self.timerInitUI()
-        self.test_screen = TestScreen()
-
-    def timerInitUI(self):
-        pass
+        self.test_screen = None
 
     def tasksInitUI(self):
         self.tasks.setMinimum(3)
@@ -65,8 +110,9 @@ class StartTestBase(QWidget):
     def handleTestStart(self):
         questions_quantity = self.tasks.value()
         time = str(self.timer.time().toPyTime())
-        test = Test(questions_quantity, time)
+        test = Test(questions_quantity, time, 'stress')
         test.start()
+        self.test_screen = TestScreen(test)
         self.hide()
         self.test_screen.show()
 
