@@ -13,6 +13,13 @@ class Notification(QWidget):
         uic.loadUi("templates/notification.ui", self)
 
 
+class TestResult(QWidget):
+    def __init__(self, questions_quantity, correct_answers):
+        super().__init__()
+        uic.loadUi("templates/testResult.ui", self)
+        self.result.setText(f"Ваш результат {correct_answers} из {questions_quantity}")
+
+
 class TestScreen(QWidget):
     def __init__(self, test):
         super().__init__()
@@ -25,17 +32,22 @@ class TestScreen(QWidget):
         self.true_btn.clicked.connect(self.handleAnswer)
         self.false_btn.clicked.connect(self.handleAnswer)
         self.word.setText(self.db_word)
+        self.nextButton.clicked.connect(self.nextBtn)
+        self.nextButton.setEnabled(False)
         self.clicked = False
+        self.testResult = None
+        self.correct_count = 0
 
     def handleAnswer(self):
         sender = self.sender().text()
-        # if not self.clicked:
         if sender == "Верно" and self.is_rigth:
             self.word.setStyleSheet("* {color: green }")
             self.true_btn.setStyleSheet("* {color: green }")
+            self.correct_count += 1
         elif sender == "Неверно" and (not self.is_rigth):
             self.word.setStyleSheet("* {color: green }")
             self.false_btn.setStyleSheet("* {color: green }")
+            self.correct_count += 1
         else:
             self.word.setStyleSheet("* {color: red }")
             if sender == "Верно":
@@ -45,13 +57,27 @@ class TestScreen(QWidget):
 
         self.true_btn.setEnabled(False)
         self.false_btn.setEnabled(False)
+        self.nextButton.setEnabled(True)
+
         # self.clicked = True
 
     def nextBtn(self):
-        self.cur_index += 1
-        self.db_word = self.data[self.cur_index][0]
-        self.is_rigth = self.data[self.cur_index][1]
-        self.word.setText(self.db_word)
+        if int(self.test.qq) - 1 == self.cur_index:
+            self.testResult = TestResult(self.test.qq, self.correct_count)
+            self.testResult.show()
+            self.hide()
+        else:
+            self.cur_index += 1
+            self.db_word = self.data[self.cur_index][0]
+            self.is_rigth = self.data[self.cur_index][1]
+            self.word.setText(self.db_word)
+
+            self.clicked = False
+            self.true_btn.setEnabled(True)
+            self.false_btn.setEnabled(True)
+            self.true_btn.setStyleSheet("* {}")
+            self.false_btn.setStyleSheet("* {}")
+            self.word.setStyleSheet("* {}")
 
 
 class Test:
@@ -66,7 +92,7 @@ class Test:
         conn = psycopg2.connect(dbname='words', user='postgres', password='Uhbirf55', host='localhost')
         cursor = conn.cursor()
 
-        nums = sample(range(1, 249), 10)
+        nums = sample(range(1, 249), self.qq)
         cursor.execute(f"SELECT word, is_rigth FROM stress WHERE word_id IN {tuple(nums)}")
         data = cursor.fetchall()
         conn.commit()
@@ -81,10 +107,6 @@ class Test:
 
     def get_answers(self):
         return self.answers
-
-    def write(self):
-        """writes current test state into database"""
-        pass
 
     def finish(self):
         """finish test attempt"""
@@ -108,7 +130,7 @@ class StartTestBase(QWidget):
         self.tasks.setValue(10)
 
     def handleTestStart(self):
-        questions_quantity = self.tasks.value()
+        questions_quantity = int(self.tasks.value())
         time = str(self.timer.time().toPyTime())
         test = Test(questions_quantity, time, 'stress')
         test.start()
