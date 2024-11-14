@@ -1,9 +1,9 @@
 import sys
-from threading import Timer
 from random import sample
 
 import psycopg2
 from PyQt6 import uic
+from PyQt6.QtCore import QTimer, QTime
 from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow
 
 
@@ -25,6 +25,13 @@ class TestScreen(QWidget):
         super().__init__()
         uic.loadUi("templates/TrueFalseTestScreen.ui", self)
         self.test = test
+        self.time = test.time
+
+        self.time_left = 0
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.timing)
+        self.timer.start(1000)
+
         self.cur_index = 0
         self.data = test.data
         self.db_word = self.data[self.cur_index][0]
@@ -43,11 +50,11 @@ class TestScreen(QWidget):
         if sender == "Верно" and self.is_rigth:
             self.word.setStyleSheet("* {color: green }")
             self.true_btn.setStyleSheet("* {color: green }")
-            self.correct_count += 1
+            self.test.correct += 1
         elif sender == "Неверно" and (not self.is_rigth):
             self.word.setStyleSheet("* {color: green }")
             self.false_btn.setStyleSheet("* {color: green }")
-            self.correct_count += 1
+            self.test.correct += 1
         else:
             self.word.setStyleSheet("* {color: red }")
             if sender == "Верно":
@@ -59,13 +66,20 @@ class TestScreen(QWidget):
         self.false_btn.setEnabled(False)
         self.nextButton.setEnabled(True)
 
-        # self.clicked = True
+    def timing(self):
+        self.time_left += 1
+        print(self.time_left)
+        print(self.test.qt_time)
+
+    def finish(self):
+        self.timer.stop()
+        self.testResult = TestResult(self.test.qq, self.test.correct)
+        self.testResult.show()
+        self.hide()
 
     def nextBtn(self):
         if int(self.test.qq) - 1 == self.cur_index:
-            self.testResult = TestResult(self.test.qq, self.correct_count)
-            self.testResult.show()
-            self.hide()
+            self.finish()
         else:
             self.cur_index += 1
             self.db_word = self.data[self.cur_index][0]
@@ -73,18 +87,23 @@ class TestScreen(QWidget):
             self.word.setText(self.db_word)
 
             self.clicked = False
+
             self.true_btn.setEnabled(True)
             self.false_btn.setEnabled(True)
+            self.nextButton.setEnabled(False)
+
             self.true_btn.setStyleSheet("* {}")
             self.false_btn.setStyleSheet("* {}")
             self.word.setStyleSheet("* {}")
 
 
 class Test:
-    def __init__(self, questions_quantity, time, topic):
+    def __init__(self, questions_quantity, time, qt_time, topic):
         self.qq = questions_quantity
         self.answers = dict()
+        self.correct = 0
         self.time = int(time.split(':')[0]) * 60 + int(time.split(':')[1])
+        self.qt_time = qt_time
         if topic == 'stress':
             self.stress()
 
@@ -98,20 +117,8 @@ class Test:
         conn.commit()
         self.data = data
 
-    def start(self):
-        timer = Timer(self.time, self.finish)
-        timer.start()
-
-    def update(self, question_id: str, answer):
-        self.answers[str(question_id)] = answer
-
     def get_answers(self):
-        return self.answers
-
-    def finish(self):
-        """finish test attempt"""
-        print(self.get_answers())
-        return self.get_answers()
+        return self.correct
 
 
 class StartTestBase(QWidget):
@@ -119,7 +126,7 @@ class StartTestBase(QWidget):
         super().__init__()
         uic.loadUi("templates/startTestBase.ui", self)
         self.topic = topic
-        self.topicLabel.setText(self.topic)
+        self.topicLabel.setText(f'Вы собираетесь начать тест по теме {self.topic.lower()}')
         self.startButton.clicked.connect(self.handleTestStart)
         self.tasksInitUI()
         self.test_screen = None
@@ -132,8 +139,7 @@ class StartTestBase(QWidget):
     def handleTestStart(self):
         questions_quantity = int(self.tasks.value())
         time = str(self.timer.time().toPyTime())
-        test = Test(questions_quantity, time, 'stress')
-        test.start()
+        test = Test(questions_quantity, time, self.timer.time(), 'stress')
         self.test_screen = TestScreen(test)
         self.hide()
         self.test_screen.show()
