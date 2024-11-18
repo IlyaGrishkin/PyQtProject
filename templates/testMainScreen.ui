@@ -6,9 +6,21 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>591</width>
-    <height>637</height>
+    <width>578</width>
+    <height>738</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>578</width>
+    <height>738</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>578</width>
+    <height>738</height>
+   </size>
   </property>
   <property name="font">
    <font>
@@ -27,9 +39,9 @@
    <widget class="QLabel" name="label">
     <property name="geometry">
      <rect>
-      <x>224</x>
+      <x>0</x>
       <y>10</y>
-      <width>191</width>
+      <width>571</width>
       <height>41</height>
      </rect>
     </property>
@@ -42,14 +54,17 @@
     <property name="text">
      <string>Главное меню</string>
     </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
    </widget>
    <widget class="QGroupBox" name="groupBox">
     <property name="geometry">
      <rect>
-      <x>170</x>
-      <y>60</y>
+      <x>130</x>
+      <y>70</y>
       <width>311</width>
-      <height>451</height>
+      <height>371</height>
      </rect>
     </property>
     <property name="autoFillBackground">
@@ -98,14 +113,63 @@
      </property>
     </widget>
    </widget>
+   <widget class="QGroupBox" name="groupBox_2">
+    <property name="geometry">
+     <rect>
+      <x>130</x>
+      <y>460</y>
+      <width>311</width>
+      <height>191</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string/>
+    </property>
+    <widget class="QPushButton" name="attemptsBtn">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>10</y>
+       <width>271</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>13</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Попытки</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="addWordsBtn">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>100</y>
+       <width>271</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Добавить слова</string>
+     </property>
+    </widget>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>591</width>
-     <height>29</height>
+     <width>578</width>
+     <height>26</height>
     </rect>
    </property>
   </widget>

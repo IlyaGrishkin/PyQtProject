@@ -1,10 +1,11 @@
 import sys
-from random import sample
 
-import psycopg2
 from PyQt6 import uic
-from PyQt6.QtCore import QTimer, QTime
-from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow, QListWidget, QTableWidgetItem, QLabel
+
+from database import add_new_attempt, create_database, get_attempts, add_new_stress, get_stress, RUSSIAN_TOPICS, \
+    get_adverb
 
 
 class Notification(QWidget):
@@ -13,21 +14,80 @@ class Notification(QWidget):
         uic.loadUi("templates/notification.ui", self)
 
 
+class AccentAddForm(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("templates/stressAddWord.ui", self)
+        self.addBtn.clicked.connect(self.handleSubmit)
+
+    def handleSubmit(self):
+        word = self.input.text()
+        is_rigth = self.checkBox.isChecked()
+        add_new_stress(word, is_rigth)
+
+
+class AddWord(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("templates/addWordsNav.ui", self)
+        self.initUI()
+
+    def initUI(self):
+        self.accentButton.clicked.connect(self.accentHandler)
+        self.adverbButton.clicked.connect(self.adverbHandler)
+        self.pronounButton.clicked.connect(self.pronounHandler)
+
+    def accentHandler(self):
+        self.addWordScreen = AccentAddForm()
+        self.addWordScreen.show()
+
+    def adverbHandler(self):
+        self.addWordScreen = StartTestBase("Наречия")
+        self.addWordScreen.show()
+
+    def pronounHandler(self):
+        self.addWordScreen = StartTestBase("Местоимения")
+        self.addWordScreen.show()
+
+
+class Statistics(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("templates/statistic.ui", self)
+        data = get_attempts()
+        data.reverse()
+        for i in range(min(len(data), 10)):
+            self.tableWidget.setItem(i, 0, QTableWidgetItem(data[i][0]))
+            self.tableWidget.setItem(i, 1, QTableWidgetItem(data[i][1]))
+
+
 class TestResult(QWidget):
-    def __init__(self, questions_quantity, correct_answers):
+    def __init__(self, questions_quantity, correct_answers, mistakes):
         super().__init__()
         uic.loadUi("templates/testResult.ui", self)
         self.result.setText(f"Ваш результат {correct_answers} из {questions_quantity}")
 
+        if correct_answers == questions_quantity:
+            self.mistakesLabel.setText("Отлично! У вас нет ни одной ошибки!")
+        else:
+            self.listWidget = QListWidget()
+            self.listWidget.addItems(mistakes)
+            self.verticalLayout.addWidget(self.listWidget)
 
-class TestScreen(QWidget):
+
+class TrueFalseTestScreen(QWidget):
     def __init__(self, test):
         super().__init__()
         uic.loadUi("templates/TrueFalseTestScreen.ui", self)
         self.test = test
-        self.time = test.time
+        if self.test.topic == 'adverb':
+            self.true_btn.setText('Слитно')
+            self.false_btn.setText('Раздельно')
 
-        self.time_left = 0
+        self.time = test.time
+        self.show_time = str(self.test.qt_time.toPyTime())[:5]
+        self.timeLabel.setText(f'До конца теста осталось:  {self.show_time}')
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.timing)
         self.timer.start(1000)
@@ -42,22 +102,25 @@ class TestScreen(QWidget):
         self.nextButton.clicked.connect(self.nextBtn)
         self.nextButton.setEnabled(False)
         self.clicked = False
+
         self.testResult = None
         self.correct_count = 0
+        self.mistakes = []
 
     def handleAnswer(self):
         sender = self.sender().text()
-        if sender == "Верно" and self.is_rigth:
+        if sender in ("Верно", 'Слитно') and self.is_rigth:
             self.word.setStyleSheet("* {color: green }")
             self.true_btn.setStyleSheet("* {color: green }")
             self.test.correct += 1
-        elif sender == "Неверно" and (not self.is_rigth):
+        elif sender in ("Неверно", 'Раздельно') and (not self.is_rigth):
             self.word.setStyleSheet("* {color: green }")
             self.false_btn.setStyleSheet("* {color: green }")
             self.test.correct += 1
         else:
             self.word.setStyleSheet("* {color: red }")
-            if sender == "Верно":
+            self.mistakes.append(self.db_word)
+            if sender in ("Верно", 'Слитно'):
                 self.true_btn.setStyleSheet("* {color: red }")
             else:
                 self.false_btn.setStyleSheet("* {color: red }")
@@ -66,14 +129,23 @@ class TestScreen(QWidget):
         self.false_btn.setEnabled(False)
         self.nextButton.setEnabled(True)
 
+    def changeShowTime(self, time: int):
+        return ("0" * (2 - len(str(time // 60))) + str(time // 60) + ':'
+                + "0" * (2 - len(str(time % 60))) + str(time % 60))
+
     def timing(self):
-        self.time_left += 1
-        print(self.time_left)
-        print(self.test.qt_time)
+        self.time -= 1
+        self.show_time = self.changeShowTime(self.time)
+        self.timeLabel.setText(f'До конца теста осталось:  {self.show_time}')
+        if self.time <= 0:
+            self.finish()
 
     def finish(self):
         self.timer.stop()
-        self.testResult = TestResult(self.test.qq, self.test.correct)
+
+        self.testResult = TestResult(self.test.qq, self.test.correct, self.mistakes)
+        add_new_attempt(f'{self.test.correct}/{self.test.qq}', self.test.topic, self.mistakes)
+
         self.testResult.show()
         self.hide()
 
@@ -102,20 +174,17 @@ class Test:
         self.qq = questions_quantity
         self.answers = dict()
         self.correct = 0
+
         self.time = int(time.split(':')[0]) * 60 + int(time.split(':')[1])
         self.qt_time = qt_time
+
+        self.topic = topic
+        self.data = None
+
         if topic == 'stress':
-            self.stress()
-
-    def stress(self):
-        conn = psycopg2.connect(dbname='words', user='postgres', password='Uhbirf55', host='localhost')
-        cursor = conn.cursor()
-
-        nums = sample(range(1, 249), self.qq)
-        cursor.execute(f"SELECT word, is_rigth FROM stress WHERE word_id IN {tuple(nums)}")
-        data = cursor.fetchall()
-        conn.commit()
-        self.data = data
+            self.data = get_stress(self.qq)
+        elif topic == 'adverb':
+            self.data = get_adverb(self.qq)
 
     def get_answers(self):
         return self.correct
@@ -139,8 +208,8 @@ class StartTestBase(QWidget):
     def handleTestStart(self):
         questions_quantity = int(self.tasks.value())
         time = str(self.timer.time().toPyTime())
-        test = Test(questions_quantity, time, self.timer.time(), 'stress')
-        self.test_screen = TestScreen(test)
+        test = Test(questions_quantity, time, self.timer.time(), RUSSIAN_TOPICS[self.topic.lower()])
+        self.test_screen = TrueFalseTestScreen(test)
         self.hide()
         self.test_screen.show()
 
@@ -156,6 +225,8 @@ class MainWindow(QMainWindow):
         self.accentButton.clicked.connect(self.accentHandler)
         self.adverbButton.clicked.connect(self.adverbHandler)
         self.pronounButton.clicked.connect(self.pronounHandler)
+        self.attemptsBtn.clicked.connect(self.attemptsHandler)
+        self.addWordsBtn.clicked.connect(self.addWordHandler)
 
     def accentHandler(self):
         self.startWidget = StartTestBase("Ударения")
@@ -169,8 +240,17 @@ class MainWindow(QMainWindow):
         self.startWidget = StartTestBase("Местоимения")
         self.startWidget.show()
 
+    def attemptsHandler(self):
+        self.statisticScreen = Statistics()
+        self.statisticScreen.show()
+
+    def addWordHandler(self):
+        self.addWordNav = AddWord()
+        self.addWordNav.show()
+
 
 if __name__ == '__main__':
+    create_database()
     app = QApplication(sys.argv)
     ex = MainWindow()
     ex.show()
