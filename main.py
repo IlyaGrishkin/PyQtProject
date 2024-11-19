@@ -5,13 +5,7 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QWidget, QMainWindow, QListWidget, QTableWidgetItem, QLabel
 
 from database import add_new_attempt, create_database, get_attempts, add_new_stress, get_stress, RUSSIAN_TOPICS, \
-    get_adverb
-
-
-class Notification(QWidget):
-    def __init__(self):
-        super().__init__()
-        uic.loadUi("templates/notification.ui", self)
+    get_adverb, add_new_adverb, get_my_words, add_new_my_word
 
 
 class AccentAddForm(QWidget):
@@ -24,11 +18,39 @@ class AccentAddForm(QWidget):
         word = self.input.text()
         is_rigth = self.checkBox.isChecked()
         add_new_stress(word, is_rigth)
+        self.hide()
+
+
+class AdverbAddForm(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("templates/adverbAddWord.ui", self)
+        self.addBtn.clicked.connect(self.handleSubmit)
+
+    def handleSubmit(self):
+        word = self.input.text()
+        is_rigth = self.checkBox.isChecked()
+        add_new_adverb(word, is_rigth)
+        self.hide()
+
+
+class MyWordsAddForm(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("templates/MyWordsAddWord.ui", self)
+        self.addBtn.clicked.connect(self.handleSubmit)
+
+    def handleSubmit(self):
+        word = self.input.text()
+        is_rigth = self.checkBox.isChecked()
+        add_new_my_word(word, is_rigth)
+        self.hide()
 
 
 class AddWord(QWidget):
     def __init__(self):
         super().__init__()
+        self.addWordScreen = None
         uic.loadUi("templates/addWordsNav.ui", self)
         self.initUI()
 
@@ -36,17 +58,18 @@ class AddWord(QWidget):
         self.accentButton.clicked.connect(self.accentHandler)
         self.adverbButton.clicked.connect(self.adverbHandler)
         self.pronounButton.clicked.connect(self.pronounHandler)
+        self.pronounButton.setText('Другие слова')
 
     def accentHandler(self):
         self.addWordScreen = AccentAddForm()
         self.addWordScreen.show()
 
     def adverbHandler(self):
-        self.addWordScreen = StartTestBase("Наречия")
+        self.addWordScreen = AdverbAddForm()
         self.addWordScreen.show()
 
     def pronounHandler(self):
-        self.addWordScreen = StartTestBase("Местоимения")
+        self.addWordScreen = MyWordsAddForm()
         self.addWordScreen.show()
 
 
@@ -80,6 +103,9 @@ class TrueFalseTestScreen(QWidget):
         super().__init__()
         uic.loadUi("templates/TrueFalseTestScreen.ui", self)
         self.test = test
+        if self.test.topic == 'my_words':
+            self.task.setText('Верно ли написано слово?')
+
         if self.test.topic == 'adverb':
             self.true_btn.setText('Слитно')
             self.false_btn.setText('Раздельно')
@@ -185,6 +211,8 @@ class Test:
             self.data = get_stress(self.qq)
         elif topic == 'adverb':
             self.data = get_adverb(self.qq)
+        elif topic == 'my_words':
+            self.data = get_my_words(self.qq)
 
     def get_answers(self):
         return self.correct
@@ -195,7 +223,7 @@ class StartTestBase(QWidget):
         super().__init__()
         uic.loadUi("templates/startTestBase.ui", self)
         self.topic = topic
-        self.topicLabel.setText(f'Вы собираетесь начать тест по теме {self.topic.lower()}')
+        self.topicLabel.setText(f'Вы собираетесь начать тест по теме "{self.topic.lower()}"')
         self.startButton.clicked.connect(self.handleTestStart)
         self.tasksInitUI()
         self.test_screen = None
@@ -209,6 +237,7 @@ class StartTestBase(QWidget):
         questions_quantity = int(self.tasks.value())
         time = str(self.timer.time().toPyTime())
         test = Test(questions_quantity, time, self.timer.time(), RUSSIAN_TOPICS[self.topic.lower()])
+
         self.test_screen = TrueFalseTestScreen(test)
         self.hide()
         self.test_screen.show()
@@ -219,12 +248,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         uic.loadUi("templates/testMainScreen.ui", self)
         self.initUI()
-        self.n = Notification()
 
     def initUI(self):
         self.accentButton.clicked.connect(self.accentHandler)
         self.adverbButton.clicked.connect(self.adverbHandler)
         self.pronounButton.clicked.connect(self.pronounHandler)
+        self.pronounButton.setText("Другие слова")
         self.attemptsBtn.clicked.connect(self.attemptsHandler)
         self.addWordsBtn.clicked.connect(self.addWordHandler)
 
@@ -237,7 +266,7 @@ class MainWindow(QMainWindow):
         self.startWidget.show()
 
     def pronounHandler(self):
-        self.startWidget = StartTestBase("Местоимения")
+        self.startWidget = StartTestBase("Другие слова")
         self.startWidget.show()
 
     def attemptsHandler(self):

@@ -6,6 +6,8 @@ RUSSIAN_TOPICS = {
     'ударения': 'stress',
     'наречия': 'adverb',
     'adverb': 'Наречия',
+    'my_words': 'Мои слова',
+    'другие слова': 'my_words'
 }
 
 
@@ -19,6 +21,14 @@ def create_database():
         word TEXT,
         is_rigth boolean  
     )  """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS my_words
+        (
+            word_id INTEGER PRIMARY KEY,
+            word TEXT,
+            is_rigth boolean  
+        )  """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS attempts
@@ -51,13 +61,29 @@ def count_rows(db_name):
     return int(data[0][0])
 
 
-
-
 def add_new_stress(word, is_rigth):
     conn = sqlite3.connect('db.db')
     cursor = conn.cursor()
     cursor.execute(
         f'INSERT INTO stress (word, is_rigth) VALUES {(word, is_rigth)}'
+    )
+    conn.commit()
+
+
+def add_new_my_word(word, is_rigth):
+    conn = sqlite3.connect('db.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        f'INSERT INTO my_words (word, is_rigth) VALUES {(word, is_rigth)}'
+    )
+    conn.commit()
+
+
+def add_new_adverb(word, fused):
+    conn = sqlite3.connect('db.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        f'INSERT INTO adverb (word, fused) VALUES {(word, fused)}'
     )
     conn.commit()
 
@@ -82,6 +108,18 @@ def get_adverb(n):
     return data
 
 
+def get_my_words(n):
+    conn = sqlite3.connect('db.db')
+    cursor = conn.cursor()
+    nums = sample(range(1, count_rows('my_words') + 1), n)
+    cursor.execute(f"SELECT word, is_rigth FROM my_words WHERE word_id IN {tuple(nums)}")
+    data = cursor.fetchall()
+    conn.commit()
+    return data
+
+
+
+
 def add_new_attempt(result: str, topic, mistakes):
     topic = RUSSIAN_TOPICS[topic]
     mistakes = ';'.join(mistakes)
@@ -99,12 +137,9 @@ def get_attempts():
     cursor.execute(
         """
          SELECT result, topic FROM attempts
-         
+    
          """
     )
     data = cursor.fetchall()
     conn.commit()
     return data
-
-
-
